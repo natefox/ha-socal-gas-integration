@@ -40,7 +40,7 @@ def readings_to_hourly_statistics(
     return stats
 
 
-async def async_import_to_ha(hass, statistics_entries: list[StatisticEntry], entry_id: str) -> None:
+async def async_import_to_ha(hass, statistics_entries: list[StatisticEntry], name_slug: str) -> None:
     """Import statistics into Home Assistant's recorder."""
     from homeassistant.components.recorder.models import StatisticData, StatisticMetaData
     from homeassistant.components.recorder.statistics import async_add_external_statistics
@@ -53,7 +53,7 @@ async def async_import_to_ha(hass, statistics_entries: list[StatisticEntry], ent
         has_sum=True,
         name="SoCal Gas Usage",
         source=DOMAIN,
-        statistic_id=f"{DOMAIN}:gas_consumption_{entry_id[:8]}",
+        statistic_id=f"{DOMAIN}:gas_consumption_{name_slug}",
         unit_of_measurement="therms",
     )
     usage_stats = [
@@ -72,7 +72,7 @@ async def async_import_to_ha(hass, statistics_entries: list[StatisticEntry], ent
         has_sum=True,
         name="SoCal Gas Cost",
         source=DOMAIN,
-        statistic_id=f"{DOMAIN}:gas_cost_{entry_id[:8]}",
+        statistic_id=f"{DOMAIN}:gas_cost_{name_slug}",
         unit_of_measurement="USD",
     )
     cost_stats = [

@@ -75,25 +75,25 @@ class SoCalGasConfigFlow(ConfigFlow, domain=DOMAIN):
                 if not readings:
                     errors["base"] = "no_data"
                 else:
-                    # Create config entry first to get entry_id
-                    result = self.async_create_entry(
+                    # Import statistics before creating entry
+                    # Use account name slug for stable statistic IDs
+                    stats = readings_to_hourly_statistics(readings)
+                    name_slug = self._account_name.lower().replace(" ", "_")
+                    await async_import_to_ha(self.hass, stats, name_slug)
+                    _LOGGER.info(
+                        "Imported %d readings for %s",
+                        len(readings),
+                        self._account_name,
+                    )
+                    return self.async_create_entry(
                         title=self._account_name,
                         data={
                             CONF_ACCOUNT_NAME: self._account_name,
                             "reading_count": len(readings),
                         },
                     )
-                    # Import statistics
-                    stats = readings_to_hourly_statistics(readings)
-                    await async_import_to_ha(self.hass, stats, result["result"].entry_id)
-                    _LOGGER.info(
-                        "Imported %d readings for %s",
-                        len(readings),
-                        self._account_name,
-                    )
-                    return result
-            except (ValueError, KeyError, Exception) as err:
-                _LOGGER.error("Failed to parse uploaded file: %s", err)
+            except Exception as err:
+                _LOGGER.exception("Failed to parse uploaded file")
                 errors["base"] = "invalid_file"
 
         return self.async_show_form(
@@ -130,8 +130,11 @@ class SoCalGasOptionsFlow(OptionsFlow):
                     errors["base"] = "no_data"
                 else:
                     stats = readings_to_hourly_statistics(readings)
+                    name_slug = self.config_entry.data.get(
+                        CONF_ACCOUNT_NAME, "home"
+                    ).lower().replace(" ", "_")
                     await async_import_to_ha(
-                        self.hass, stats, self.config_entry.entry_id
+                        self.hass, stats, name_slug
                     )
                     _LOGGER.info(
                         "Re-imported %d readings",
