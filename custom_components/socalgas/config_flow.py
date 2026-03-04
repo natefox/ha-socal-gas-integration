@@ -7,7 +7,8 @@ from typing import Any
 import voluptuous as vol
 
 from homeassistant.components.file_upload import process_uploaded_file
-from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
+from homeassistant.config_entries import ConfigFlow, ConfigFlowResult, OptionsFlow
+from homeassistant.core import callback
 from homeassistant.helpers.selector import FileSelector, FileSelectorConfig
 
 from .const import CONF_ACCOUNT_NAME, CONF_UPLOADED_FILE, DOMAIN
@@ -35,6 +36,12 @@ class SoCalGasConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a config flow for SoCal Gas."""
 
     VERSION = 1
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(config_entry):
+        """Get the options flow handler."""
+        return SoCalGasOptionsFlow(config_entry)
 
     def __init__(self) -> None:
         """Initialize the config flow."""
@@ -91,6 +98,52 @@ class SoCalGasConfigFlow(ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id="upload",
+            data_schema=STEP_UPLOAD_SCHEMA,
+            errors=errors,
+        )
+
+    def _parse_upload(self, file_id: str):
+        """Parse an uploaded Green Button ZIP file."""
+        with process_uploaded_file(self.hass, file_id) as file_path:
+            return parse_green_button_zip(file_path)
+
+
+class SoCalGasOptionsFlow(OptionsFlow):
+    """Handle options for SoCal Gas."""
+
+    def __init__(self, config_entry):
+        """Initialize options flow."""
+        self.config_entry = config_entry
+
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Handle the options step."""
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            try:
+                file_id = user_input[CONF_UPLOADED_FILE]
+                readings, summary = await self.hass.async_add_executor_job(
+                    self._parse_upload, file_id
+                )
+                if not readings:
+                    errors["base"] = "no_data"
+                else:
+                    stats = readings_to_hourly_statistics(readings)
+                    await async_import_to_ha(
+                        self.hass, stats, self.config_entry.entry_id
+                    )
+                    _LOGGER.info(
+                        "Re-imported %d readings",
+                        len(readings),
+                    )
+                    return self.async_create_entry(data={})
+            except Exception as err:
+                _LOGGER.error("Failed to parse uploaded file: %s", err)
+                errors["base"] = "invalid_file"
+
+        return self.async_show_form(
+            step_id="init",
             data_schema=STEP_UPLOAD_SCHEMA,
             errors=errors,
         )

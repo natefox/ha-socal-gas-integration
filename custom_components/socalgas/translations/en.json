@@ -23,5 +23,20 @@
     "abort": {
       "already_configured": "This account is already configured."
     }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Import Additional Data",
+        "description": "Upload another Green Button ZIP file to import additional usage data.",
+        "data": {
+          "uploaded_file": "Green Button ZIP File"
+        }
+      }
+    },
+    "error": {
+      "invalid_file": "Could not parse the uploaded file.",
+      "no_data": "The uploaded file contained no usage data."
+    }
   }
 }
