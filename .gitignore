@@ -1,0 +1,6 @@
+config/
+!custom_components/
+__pycache__/
+*.pyc
+.env
+*.egg-info/
