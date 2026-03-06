@@ -7,8 +7,6 @@
 
 A custom Home Assistant integration that imports gas usage data from Southern California Gas Company (SoCal Gas) using their Green Button data export.
 
-[![Open your Home Assistant instance and start setting up a new integration.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=socalgas)
-
 ## Features
 
 - **Two setup methods:** Automatic login with socalgas.com credentials, or manual Green Button ZIP upload
