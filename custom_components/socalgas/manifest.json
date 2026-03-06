@@ -1,13 +1,13 @@
 {
   "domain": "socalgas",
   "name": "SoCal Gas",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "documentation": "https://github.com/nfox/ha-socal-gas-integration",
   "issue_tracker": "https://github.com/nfox/ha-socal-gas-integration/issues",
   "codeowners": ["@nfox"],
   "dependencies": ["file_upload"],
   "requirements": [],
   "config_flow": true,
-  "iot_class": "local_push",
+  "iot_class": "cloud_polling",
   "integration_type": "service"
 }

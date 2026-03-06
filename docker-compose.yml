@@ -1,6 +1,6 @@
 services:
   homeassistant:
-    image: ghcr.io/home-assistant/home-assistant:stable
+    image: ghcr.io/home-assistant/home-assistant:latest
     container_name: ha-socalgas-dev
     restart: unless-stopped
     volumes:
@@ -11,3 +11,12 @@ services:
       - "8123:8123"
     environment:
       - TZ=America/Los_Angeles
+      - SOCALGAS_BROWSER_URL=http://playwright:3000
+
+  playwright:
+    build: ./playwright-sidecar
+    container_name: ha-socalgas-playwright
+    restart: unless-stopped
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
