@@ -21,6 +21,7 @@ from homeassistant.helpers.update_coordinator import (
 
 from .api import SoCalGasAPI, SoCalGasAuthError, SoCalGasConnectionError
 from .const import (
+    CONF_BROWSERLESS_URL,
     CONF_LOOKBACK_DAYS,
     CONF_PASSWORD,
     CONF_REFRESH_INTERVAL_HOURS,
@@ -76,10 +77,12 @@ class SoCalGasCoordinator(DataUpdateCoordinator):
         if not username or not password:
             raise UpdateFailed("No credentials configured")
 
-        async with self._download_lock:
-            return await self._do_update(username, password)
+        browserless_url = self.entry.data.get(CONF_BROWSERLESS_URL)
 
-    async def _do_update(self, username: str, password: str) -> dict:
+        async with self._download_lock:
+            return await self._do_update(username, password, browserless_url)
+
+    async def _do_update(self, username: str, password: str, browserless_url: str | None = None) -> dict:
         """Run the actual update (must be called under _download_lock)."""
         # Reuse the already-authenticated API from the config flow if
         # available, to avoid a second login that triggers rate limiting.
@@ -89,7 +92,7 @@ class SoCalGasCoordinator(DataUpdateCoordinator):
             api = pending_api
         else:
             _LOGGER.info("Creating new API session, will authenticate")
-            api = SoCalGasAPI(username, password)
+            api = SoCalGasAPI(username, password, browserless_url=browserless_url)
         try:
             if not pending_api:
                 _LOGGER.info("Authenticating with SoCal Gas...")
@@ -200,8 +203,10 @@ class SoCalGasCoordinator(DataUpdateCoordinator):
             _LOGGER.error("Cannot redownload: no credentials configured")
             return
 
+        browserless_url = self.entry.data.get(CONF_BROWSERLESS_URL)
+
         async with self._download_lock:
-            api = SoCalGasAPI(username, password)
+            api = SoCalGasAPI(username, password, browserless_url=browserless_url)
             try:
                 await api.authenticate()
                 await self._download_range(

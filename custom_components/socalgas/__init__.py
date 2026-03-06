@@ -6,11 +6,23 @@ import logging
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
-from .const import CONF_USERNAME, DOMAIN
+from .const import CONF_BROWSERLESS_URL, CONF_USERNAME, DEFAULT_BROWSERLESS_URL, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
 PLATFORMS: list[str] = []
+
+
+async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Migrate config entry to a new version."""
+    if entry.version == 1:
+        _LOGGER.debug("Migrating config entry from version 1 to 2")
+        new_data = {**entry.data}
+        if entry.data.get(CONF_USERNAME):
+            new_data[CONF_BROWSERLESS_URL] = DEFAULT_BROWSERLESS_URL
+        hass.config_entries.async_update_entry(entry, data=new_data, version=2)
+        _LOGGER.info("Migration to version 2 successful")
+    return True
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -24,10 +36,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         coordinator = SoCalGasCoordinator(hass, entry)
         hass.data[DOMAIN][entry.entry_id] = coordinator
 
-        # Await the first refresh so errors surface in the HA UI.
-        # If it fails, HA marks the entry as "Retrying setup" and
-        # shows the error on the integration card with a retry button.
-        await coordinator.async_config_entry_first_refresh()
+        # Start the first refresh in the background so the config flow
+        # finishes immediately. Progress is reported via notifications.
+        await coordinator.async_request_refresh()
 
     entry.async_on_unload(entry.add_update_listener(_async_options_updated))
 

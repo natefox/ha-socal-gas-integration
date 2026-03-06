@@ -9,3 +9,5 @@ CONF_METER_NUMBER = "meter_number"
 CONF_LOOKBACK_DAYS = "lookback_days"
 CONF_REFRESH_INTERVAL_HOURS = "refresh_interval_hours"
 DEFAULT_REFRESH_INTERVAL_HOURS = 24
+CONF_BROWSERLESS_URL = "browserless_url"
+DEFAULT_BROWSERLESS_URL = "http://browserless:3000"

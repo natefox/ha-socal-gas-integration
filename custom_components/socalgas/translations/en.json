@@ -11,10 +11,14 @@
       },
       "credentials": {
         "title": "SoCal Gas Login",
-        "description": "Enter your socalgas.com login credentials for automatic daily data fetching. Your credentials are stored locally and only used to download your usage data.\n\nIf login fails, you can go back and choose file upload instead.",
+        "description": "Enter your socalgas.com login credentials for automatic daily data fetching. Your credentials are stored locally and only used to download your usage data.\n\nRequires a Browserless Chrome instance (Docker service or HA add-on).\n\nIf login fails, you can go back and choose file upload instead.",
         "data": {
           "username": "Email / Username",
-          "password": "Password"
+          "password": "Password",
+          "browserless_url": "Browserless URL"
+        },
+        "data_description": {
+          "browserless_url": "URL of your Browserless Chrome instance. For Docker, use http://browserless:3000. For the HA add-on, use http://addon-browserless-chrome:3000. Append ?token=YOUR_TOKEN if authentication is enabled."
         }
       },
       "account_name": {
@@ -54,7 +58,8 @@
         "description": "Your SoCal Gas session has expired. Please re-enter your credentials.",
         "data": {
           "username": "Email / Username",
-          "password": "Password"
+          "password": "Password",
+          "browserless_url": "Browserless URL"
         }
       }
     },
@@ -62,7 +67,7 @@
       "invalid_file": "Could not parse the uploaded file. Please upload a valid Green Button ZIP from socalgas.com.",
       "no_data": "The uploaded file contained no usage data.",
       "invalid_auth": "Invalid username or password.",
-      "cannot_connect": "Could not connect to socalgas.com. The site may be rate-limiting requests \u2014 wait a few minutes and try again."
+      "cannot_connect": "Could not connect. Check that Browserless Chrome is running and reachable at the configured URL, or the site may be rate-limiting requests \u2014 wait a few minutes and try again."
     },
     "abort": {
       "already_configured": "This account is already configured.",

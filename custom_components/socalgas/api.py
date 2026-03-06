@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import logging
-import os
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -46,9 +45,9 @@ class AccountInfo:
 class SoCalGasAPI:
     """Client for the SoCal Gas API.
 
-    Authentication is handled by the Playwright sidecar (browser
-    automation) which captures the AccessToken. Data downloads
-    use plain HTTP with the captured token.
+    Authentication is handled by Browserless Chrome (browser
+    automation via /function API) which captures the AccessToken.
+    Data downloads use plain HTTP with the captured token.
     """
 
     def __init__(
@@ -56,12 +55,14 @@ class SoCalGasAPI:
         username: str,
         password: str,
         session: aiohttp.ClientSession | None = None,
+        browserless_url: str | None = None,
     ) -> None:
         """Initialize the API client."""
         self._username = username
         self._password = password
         self._external_session = session is not None
         self._session = session
+        self._browserless_url = browserless_url
         self._access_token: str | None = None
         self._account_info: AccountInfo | None = None
 
@@ -86,22 +87,21 @@ class SoCalGasAPI:
     async def authenticate(self) -> AccountInfo:
         """Perform full authentication flow and return account info.
 
-        Uses Playwright browser automation to handle the socalgas.com
-        login (which requires client-side JavaScript).
+        Uses Browserless Chrome to handle the socalgas.com login
+        (which requires client-side JavaScript).
         """
         from .browser import browser_authenticate
 
-        browser_url = os.environ.get("SOCALGAS_BROWSER_URL")
-        if not browser_url:
+        if not self._browserless_url:
             raise SoCalGasAuthError(
-                "The Playwright sidecar is not configured. "
-                "Set the SOCALGAS_BROWSER_URL environment variable "
-                "(e.g. http://playwright:3000) and ensure the sidecar "
-                "container is running."
+                "Browserless Chrome is not configured. "
+                "Set the Browserless URL in the integration config "
+                "(e.g. http://browserless:3000) and ensure the Browserless "
+                "container or add-on is running."
             )
 
         access_token, account_number = await browser_authenticate(
-            browser_url, self._username, self._password
+            self._browserless_url, self._username, self._password
         )
         self._access_token = access_token
 

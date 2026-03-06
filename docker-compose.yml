@@ -11,12 +11,13 @@ services:
       - "8123:8123"
     environment:
       - TZ=America/Los_Angeles
-      - SOCALGAS_BROWSER_URL=http://playwright:3000
 
-  playwright:
-    build: ./playwright-sidecar
-    container_name: ha-socalgas-playwright
+  browserless:
+    image: ghcr.io/browserless/chromium
+    container_name: ha-socalgas-browserless
     restart: unless-stopped
+    environment:
+      - TOKEN=my-secret-token
     dns:
       - 8.8.8.8
       - 8.8.4.4

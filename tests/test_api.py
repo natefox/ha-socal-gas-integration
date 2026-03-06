@@ -22,7 +22,10 @@ from custom_components.socalgas.api import (  # noqa: E402
 @pytest.fixture
 def api():
     """Create a SoCalGasAPI instance."""
-    return SoCalGasAPI("test@email.com", "testpassword")
+    return SoCalGasAPI(
+        "test@email.com", "testpassword",
+        browserless_url="http://browserless:3000",
+    )
 
 
 class TestSoCalGasAPI:
@@ -32,12 +35,24 @@ class TestSoCalGasAPI:
         """Test API client initialization."""
         assert api._username == "test@email.com"
         assert api._password == "testpassword"
+        assert api._browserless_url == "http://browserless:3000"
         assert api._access_token is None
         assert api._account_info is None
+
+    def test_init_without_browserless_url(self):
+        """Test API client initialization without browserless URL."""
+        api = SoCalGasAPI("test@email.com", "testpassword")
+        assert api._browserless_url is None
 
     def test_account_info_initially_none(self, api):
         """Test that account_info is None before authentication."""
         assert api.account_info is None
+
+    def test_authenticate_without_browserless_url_raises(self):
+        """Test that authenticate raises if no browserless URL configured."""
+        api = SoCalGasAPI("test@email.com", "testpassword")
+        with pytest.raises(SoCalGasAuthError, match="Browserless Chrome is not configured"):
+            asyncio.get_event_loop().run_until_complete(api.authenticate())
 
     def test_download_without_auth_raises(self, api):
         """Test that download raises if not authenticated."""
@@ -59,7 +74,11 @@ class TestSoCalGasAPI:
         """Test that close does not close an external session."""
         mock_session = MagicMock()
         mock_session.closed = False
-        api = SoCalGasAPI("test@email.com", "pass", session=mock_session)
+        api = SoCalGasAPI(
+            "test@email.com", "pass",
+            session=mock_session,
+            browserless_url="http://browserless:3000",
+        )
         asyncio.get_event_loop().run_until_complete(api.close())
         mock_session.close.assert_not_called()
 

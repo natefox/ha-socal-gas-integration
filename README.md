@@ -1,6 +1,13 @@
 # SoCal Gas Integration for Home Assistant
 
+<img src="https://github.com/nfox/ha-socal-gas-integration/raw/main/custom_components/socalgas/logo.png" width="128" alt="SoCal Gas logo">
+
+[![hacs_badge](https://img.shields.io/badge/HACS-Custom-blue?style=for-the-badge&logo=homeassistantcommunitystore&logoColor=ccc)](https://hacs.xyz)
+[![HA Version](https://img.shields.io/badge/HA-2024.1.0+-green?style=for-the-badge&logo=home-assistant&logoColor=ccc)](https://www.home-assistant.io)
+
 A custom Home Assistant integration that imports gas usage data from Southern California Gas Company (SoCal Gas) using their Green Button data export.
+
+[![Open your Home Assistant instance and start setting up a new integration.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=socalgas)
 
 ## Features
 
@@ -15,49 +22,96 @@ A custom Home Assistant integration that imports gas usage data from Southern Ca
 
 ## Installation
 
-### HACS (Recommended)
+### Step I: Install the integration
 
-1. Open HACS in your Home Assistant instance
-2. Click the three dots in the top right corner and select "Custom repositories"
-3. Add this repository URL and select "Integration" as the category
-4. Click "Download" on the SoCal Gas integration
-5. Restart Home Assistant
+#### Option 1: via HACS
 
-### Manual Installation
+[![Open your Home Assistant instance and add this repository to HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=nfox&repository=ha-socal-gas-integration&category=integration)
 
-1. Copy the `custom_components/socalgas` directory to your Home Assistant's `custom_components` directory
-2. Restart Home Assistant
+1. Click the button above, or manually add this repository as a custom repository in HACS
+2. Search for "SoCal Gas" and download the integration
+3. **Restart Home Assistant**
+4. Continue to _Step II: Adding the integration_
 
-## Setup
+#### Option 2: Manual installation
 
-When adding the integration, you'll see two options:
+1. Using the tool of choice, open the directory for your HA configuration (where you find `configuration.yaml`)
+2. If you do not have a `custom_components` directory there, you need to create it
+3. Copy the `custom_components/socalgas` directory from this repository into your `custom_components` directory
+4. **Restart Home Assistant**
+5. Continue to _Step II: Adding the integration_
 
-### Option 1: Log in with Credentials (Automated, Docker only)
+### Step II: Adding the integration
 
-> **Note:** This method requires the Playwright sidecar container, which only works with Docker-based HA installs. If you're running HA OS, use the file upload method below.
+**You must have installed the integration (Step I) before proceeding!**
+
+#### Option 1: My Home Assistant (2021.3+)
+
+Just click the following button to start the configuration automatically:
+
+[![Open your Home Assistant instance and start setting up a new integration.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=socalgas)
+
+#### Option 2: Manually
 
 1. Go to **Settings** > **Devices & Services** > **Add Integration**
-2. Search for "SoCal Gas"
-3. Choose **Log in with socalgas.com credentials**
-4. Enter your socalgas.com email and password
-5. Name your account (defaults to last 4 digits of account number)
-6. Choose how many days of historical data to import (default: 365)
-7. The integration will automatically fetch data daily
+2. Search for "SoCal Gas" and select it
 
-**Docker setup required:** You must run the Playwright sidecar container alongside HA. See [Development](#development) for docker-compose setup.
+#### Setup options
 
-### Option 2: Upload Green Button Data (Manual, works everywhere)
+When adding the integration, you'll see two setup methods:
 
-This works on all HA installations including HA OS, HA Supervised, and Docker.
+**Log in with socalgas.com credentials (Automated)**
+
+> Requires [Browserless Chrome](https://www.browserless.io/) — a headless browser service that handles the socalgas.com login flow. See [Browserless Setup](#browserless-setup) below for your install type.
+
+1. Choose **Log in with socalgas.com credentials**
+2. Enter your socalgas.com email, password, and Browserless URL
+3. Name your account (defaults to last 4 digits of account number)
+4. Choose how many days of historical data to import (default: 365)
+5. The integration will automatically fetch data daily
+
+**Upload Green Button Data (Manual, works everywhere)**
+
+This works on all HA installations without any additional setup.
 
 1. Log in to your account at [socalgas.com](https://www.socalgas.com)
 2. Navigate to **My Account** → **Analyze Usage** → **Download My Data (Green Button)**
 3. Select the date range you want (up to 13 months)
 4. Choose "60 Minute" interval and download the ZIP file
-5. Go to **Settings** > **Devices & Services** > **Add Integration**
-6. Search for "SoCal Gas"
-7. Choose **Upload a Green Button data file**
-8. Upload the ZIP file and name your account
+5. Choose **Upload a Green Button data file**
+6. Upload the ZIP file and name your account
+
+### Browserless Setup
+
+The credentials method requires a Browserless Chrome instance because the socalgas.com login page uses client-side JavaScript that cannot be handled by plain HTTP requests.
+
+#### HA OS / HA Supervised
+
+1. Install the **Browserless Chrome** add-on from the [alexbelgium add-on repository](https://github.com/alexbelgium/hassio-addons)
+2. Start the add-on
+3. In the integration config, set the Browserless URL to `http://addon-browserless-chrome:3000` (append `?token=YOUR_TOKEN` if you configured a token in the add-on)
+
+#### Docker
+
+Add the Browserless service to your `docker-compose.yml`:
+
+```yaml
+browserless:
+  image: ghcr.io/browserless/chromium
+  container_name: ha-socalgas-browserless
+  restart: unless-stopped
+  environment:
+    - TOKEN=my-secret-token
+  dns:
+    - 8.8.8.8
+    - 8.8.4.4
+```
+
+In the integration config, set the Browserless URL to `http://browserless:3000?token=my-secret-token`.
+
+#### HA Core (venv)
+
+Run Browserless Chrome as a standalone Docker container and set the Browserless URL to `http://localhost:3000?token=my-secret-token` (or wherever Browserless is reachable).
 
 ### Energy Dashboard Setup
 
@@ -112,12 +166,10 @@ Only one download operation runs at a time — if you trigger a re-download whil
 
 | Install Method | Credentials (auto) | File Upload (manual) |
 |---|---|---|
-| HA Container (Docker) | Yes (with sidecar) | Yes |
-| HA OS | No | Yes |
-| HA Supervised | Experimental | Yes |
-| HA Core | No | Yes |
-
-The credentials method requires the Playwright sidecar Docker container because the socalgas.com login page uses client-side JavaScript that cannot be handled by plain HTTP requests.
+| HA Container (Docker) | Yes (with Browserless service) | Yes |
+| HA OS | Yes (with Browserless add-on) | Yes |
+| HA Supervised | Yes (with Browserless add-on) | Yes |
+| HA Core | Yes (with external Browserless) | Yes |
 
 ## Development
 
@@ -129,27 +181,14 @@ The credentials method requires the Playwright sidecar Docker container because 
 ### Running the Dev Environment
 
 ```bash
-docker compose up -d --build
+docker compose up -d
 ```
 
-This starts both Home Assistant and the Playwright sidecar container. Open http://localhost:8123 to access HA.
+This starts both Home Assistant and the Browserless Chrome container. Open http://localhost:8123 to access HA.
 
 The `custom_components/socalgas` directory is mounted into the container, so code changes are reflected on restart.
 
-### Playwright Sidecar
-
-The sidecar container runs headless Chromium to handle the socalgas.com login flow. It's configured via `docker-compose.yml` and communicates with HA over the Docker network.
-
-```bash
-# Rebuild sidecar after changes
-docker compose build playwright && docker compose up -d playwright
-
-# Check sidecar health
-docker exec ha-socalgas-playwright curl -s http://localhost:3000/health
-
-# View sidecar logs
-docker logs ha-socalgas-playwright -f --tail=50
-```
+The default Browserless URL for the dev environment is `http://browserless:3000?token=my-secret-token`.
 
 ### Running Tests
 

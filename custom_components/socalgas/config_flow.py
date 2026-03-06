@@ -26,12 +26,14 @@ from .api import SoCalGasAPI, SoCalGasAuthError, SoCalGasConnectionError
 from .const import (
     CONF_ACCOUNT_NAME,
     CONF_ACCOUNT_NUMBER,
+    CONF_BROWSERLESS_URL,
     CONF_LOOKBACK_DAYS,
     CONF_METER_NUMBER,
     CONF_PASSWORD,
     CONF_REFRESH_INTERVAL_HOURS,
     CONF_UPLOADED_FILE,
     CONF_USERNAME,
+    DEFAULT_BROWSERLESS_URL,
     DEFAULT_REFRESH_INTERVAL_HOURS,
     DOMAIN,
 )
@@ -50,6 +52,9 @@ STEP_CREDENTIALS_SCHEMA = vol.Schema(
     {
         vol.Required(CONF_USERNAME): str,
         vol.Required(CONF_PASSWORD): str,
+        vol.Optional(
+            CONF_BROWSERLESS_URL, default=DEFAULT_BROWSERLESS_URL
+        ): str,
     }
 )
 
@@ -65,7 +70,7 @@ STEP_UPLOAD_SCHEMA = vol.Schema(
 class SoCalGasConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a config flow for SoCal Gas."""
 
-    VERSION = 1
+    VERSION = 2
 
     @staticmethod
     @callback
@@ -78,6 +83,7 @@ class SoCalGasConfigFlow(ConfigFlow, domain=DOMAIN):
         self._account_name: str = ""
         self._username: str = ""
         self._password: str = ""
+        self._browserless_url: str = DEFAULT_BROWSERLESS_URL
         self._account_number: str = ""
         self._meter_number: str = ""
         self._api: SoCalGasAPI | None = None
@@ -102,8 +108,15 @@ class SoCalGasConfigFlow(ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             self._username = user_input[CONF_USERNAME]
             self._password = user_input[CONF_PASSWORD]
+            self._browserless_url = user_input.get(
+                CONF_BROWSERLESS_URL, DEFAULT_BROWSERLESS_URL
+            )
 
-            api = SoCalGasAPI(self._username, self._password)
+            api = SoCalGasAPI(
+                self._username,
+                self._password,
+                browserless_url=self._browserless_url,
+            )
             try:
                 account_info = await api.authenticate()
                 self._account_number = account_info.account_number
@@ -193,6 +206,7 @@ class SoCalGasConfigFlow(ConfigFlow, domain=DOMAIN):
                     CONF_ACCOUNT_NAME: self._account_name,
                     CONF_USERNAME: self._username,
                     CONF_PASSWORD: self._password,
+                    CONF_BROWSERLESS_URL: self._browserless_url,
                     CONF_ACCOUNT_NUMBER: self._account_number,
                     CONF_METER_NUMBER: self._meter_number,
                     CONF_LOOKBACK_DAYS: self._lookback_days,
@@ -284,20 +298,27 @@ class SoCalGasConfigFlow(ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
 
         if user_input is not None:
+            reauth_entry = self._get_reauth_entry()
+            browserless_url = user_input.get(
+                CONF_BROWSERLESS_URL,
+                reauth_entry.data.get(CONF_BROWSERLESS_URL, DEFAULT_BROWSERLESS_URL),
+            )
             api = SoCalGasAPI(
-                user_input[CONF_USERNAME], user_input[CONF_PASSWORD]
+                user_input[CONF_USERNAME],
+                user_input[CONF_PASSWORD],
+                browserless_url=browserless_url,
             )
             try:
                 account_info = await api.authenticate()
                 await api.close()
 
-                reauth_entry = self._get_reauth_entry()
                 return self.async_update_reload_and_abort(
                     reauth_entry,
                     data={
                         **reauth_entry.data,
                         CONF_USERNAME: user_input[CONF_USERNAME],
                         CONF_PASSWORD: user_input[CONF_PASSWORD],
+                        CONF_BROWSERLESS_URL: browserless_url,
                         CONF_ACCOUNT_NUMBER: account_info.account_number,
                         CONF_METER_NUMBER: account_info.meter_number,
                     },
