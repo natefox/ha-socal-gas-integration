@@ -1,0 +1,23 @@
+services:
+  homeassistant:
+    image: ghcr.io/home-assistant/home-assistant:latest
+    container_name: ha-socalgas-dev
+    restart: unless-stopped
+    volumes:
+      - ./config:/config
+      - ./custom_components:/config/custom_components
+      - /etc/localtime:/etc/localtime:ro
+    ports:
+      - "8123:8123"
+    environment:
+      - TZ=America/Los_Angeles
+
+  browserless:
+    image: ghcr.io/browserless/chromium
+    container_name: ha-socalgas-browserless
+    restart: unless-stopped
+    environment:
+      - TOKEN=my-secret-token
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
