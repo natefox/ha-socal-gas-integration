@@ -42,11 +42,17 @@ def test_readings_to_hourly_statistics_basic():
     ]
     stats = readings_to_hourly_statistics(readings)
     assert len(stats) == 3
-    assert stats[0].usage_sum == 0.5
+    # therms * 100 = ft³: 0.5 therms = 50 ft³
+    assert stats[0].usage_state == 50.0
+    assert stats[0].usage_sum == 50.0
     assert stats[0].cost_sum == 1.50
-    assert stats[1].usage_sum == 1.25
+    # 0.75 therms = 75 ft³, cumulative = 125
+    assert stats[1].usage_state == 75.0
+    assert stats[1].usage_sum == 125.0
     assert stats[1].cost_sum == 3.50
-    assert stats[2].usage_sum == 1.50
+    # 0.25 therms = 25 ft³, cumulative = 150
+    assert stats[2].usage_state == 25.0
+    assert stats[2].usage_sum == 150.0
     assert stats[2].cost_sum == 4.30
 
 
@@ -76,5 +82,6 @@ def test_readings_with_initial_sum():
         ),
     ]
     stats = readings_to_hourly_statistics(readings, initial_usage_sum=100.0, initial_cost_sum=500.0)
-    assert stats[0].usage_sum == 100.5
+    # 0.5 therms = 50 ft³, cumulative = 100 + 50 = 150
+    assert stats[0].usage_sum == 150.0
     assert stats[0].cost_sum == 501.50

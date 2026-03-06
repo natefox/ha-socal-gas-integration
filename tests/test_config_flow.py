@@ -66,10 +66,12 @@ def test_statistics_import_uses_name_slug_not_entry_id():
 
 
 def test_statistics_import_called_before_create_entry():
-    """Verify that statistics import happens before async_create_entry.
+    """Verify that statistics import happens before async_create_entry
+    in the config flow's upload_name step.
 
     This ensures we don't depend on the FlowResult to get an entry_id.
-    We verify this by checking the source code order.
+    We verify this by checking the source code order within
+    async_step_upload_name.
     """
     config_flow_path = (
         Path(__file__).parent.parent
@@ -79,12 +81,16 @@ def test_statistics_import_called_before_create_entry():
     )
     source = config_flow_path.read_text()
 
-    # Find the positions of key operations in async_step_upload
-    import_pos = source.find("await async_import_to_ha(")
-    create_entry_pos = source.find("return self.async_create_entry(")
+    # Find async_step_upload_name and check order within it
+    method_start = source.find("async def async_step_upload_name(")
+    assert method_start != -1, "async_step_upload_name not found"
 
-    assert import_pos != -1, "async_import_to_ha call not found in config_flow.py"
-    assert create_entry_pos != -1, "async_create_entry call not found in config_flow.py"
+    method_source = source[method_start:]
+    import_pos = method_source.find("await async_import_to_ha(")
+    create_entry_pos = method_source.find("return self.async_create_entry(")
+
+    assert import_pos != -1, "async_import_to_ha call not found in async_step_upload_name"
+    assert create_entry_pos != -1, "async_create_entry call not found in async_step_upload_name"
     assert import_pos < create_entry_pos, (
         "async_import_to_ha must be called BEFORE async_create_entry to avoid "
         "depending on FlowResult['result'] which doesn't exist"

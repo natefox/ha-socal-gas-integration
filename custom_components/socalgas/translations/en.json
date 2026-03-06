@@ -3,40 +3,119 @@
     "step": {
       "user": {
         "title": "SoCal Gas",
-        "description": "Name this SoCal Gas account or service location.",
+        "description": "Choose how to set up your SoCal Gas account.",
+        "menu_options": {
+          "credentials": "Log in with socalgas.com credentials",
+          "upload": "Upload a Green Button data file"
+        }
+      },
+      "credentials": {
+        "title": "SoCal Gas Login",
+        "description": "Enter your socalgas.com login credentials for automatic daily data fetching. Your credentials are stored locally and only used to download your usage data.\n\nRequires a Browserless Chrome instance (Docker service or HA add-on).\n\nIf login fails, you can go back and choose file upload instead.",
+        "data": {
+          "username": "Email / Username",
+          "password": "Password",
+          "browserless_url": "Browserless URL"
+        },
+        "data_description": {
+          "browserless_url": "URL of your Browserless Chrome instance. For Docker, use http://browserless:3000. For the HA add-on, use http://addon-browserless-chrome:3000. Append ?token=YOUR_TOKEN if authentication is enabled."
+        }
+      },
+      "account_name": {
+        "title": "Name This Account",
+        "description": "Account {account_number}, Meter {meter_number}. Give this account a friendly name.",
         "data": {
           "account_name": "Account Name"
         }
       },
+      "lookback": {
+        "title": "Historical Data Import",
+        "description": "How many days of historical data should we import? Larger values take longer on first setup.",
+        "data": {
+          "lookback_days": "Days of history"
+        }
+      },
+      "finish": {
+        "title": "Ready to Import",
+        "description": "Setup is complete! After you click Submit, historical data will download in the background.\n\nYou can monitor progress in the **Notifications** panel (bell icon in the sidebar). Daily updates will happen automatically after the initial import finishes."
+      },
       "upload": {
         "title": "Upload Usage Data",
-        "description": "Upload a Green Button ZIP file downloaded from socalgas.com.",
+        "description": "Upload a Green Button ZIP file downloaded from socalgas.com.\n\nTo get this file: log in at socalgas.com \u2192 My Account \u2192 Analyze Usage \u2192 Download My Data (Green Button).",
         "data": {
           "uploaded_file": "Green Button ZIP File"
+        }
+      },
+      "upload_name": {
+        "title": "Name This Account",
+        "description": "Give this account a friendly name.",
+        "data": {
+          "account_name": "Account Name"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Re-authenticate SoCal Gas",
+        "description": "Your SoCal Gas session has expired. Please re-enter your credentials.",
+        "data": {
+          "username": "Email / Username",
+          "password": "Password",
+          "browserless_url": "Browserless URL"
         }
       }
     },
     "error": {
       "invalid_file": "Could not parse the uploaded file. Please upload a valid Green Button ZIP from socalgas.com.",
-      "no_data": "The uploaded file contained no usage data."
+      "no_data": "The uploaded file contained no usage data.",
+      "invalid_auth": "Invalid username or password.",
+      "cannot_connect": "Could not connect. Check that Browserless Chrome is running and reachable at the configured URL, or the site may be rate-limiting requests \u2014 wait a few minutes and try again."
     },
     "abort": {
-      "already_configured": "This account is already configured."
+      "already_configured": "This account is already configured.",
+      "reauth_successful": "Re-authentication successful."
     }
   },
   "options": {
     "step": {
       "init": {
+        "title": "Configure SoCal Gas",
+        "description": "Choose an action.",
+        "menu_options": {
+          "redownload": "Re-download a date range",
+          "upload": "Upload a Green Button file",
+          "settings": "Change settings"
+        }
+      },
+      "redownload": {
+        "title": "Re-download Data",
+        "description": "Choose a date range to re-download from socalgas.com. The earliest allowed date is **{earliest_date}**.\n\nThe download will run in the background — check the Notifications panel for progress.",
+        "data": {
+          "start_date": "Start date",
+          "end_date": "End date"
+        }
+      },
+      "upload": {
         "title": "Import Additional Data",
-        "description": "Upload another Green Button ZIP file to import additional usage data.",
+        "description": "Upload another Green Button ZIP file to import additional usage data. Duplicate data is handled automatically.",
         "data": {
           "uploaded_file": "Green Button ZIP File"
+        }
+      },
+      "settings": {
+        "title": "Settings",
+        "description": "Configure how often the integration refreshes data from socalgas.com.",
+        "data": {
+          "refresh_interval_hours": "Refresh interval"
         }
       }
     },
     "error": {
       "invalid_file": "Could not parse the uploaded file.",
-      "no_data": "The uploaded file contained no usage data."
+      "no_data": "The uploaded file contained no usage data.",
+      "date_too_old": "Start date cannot be more than 730 days (2 years) in the past.",
+      "end_before_start": "End date must be on or after start date."
+    },
+    "abort": {
+      "redownload_started": "Download started! Check the Notifications panel for progress."
     }
   }
 }

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <!-- Gas flame -->
+  <path d="M12 2C9.5 5.5 6 9 6 13.5C6 17.1 8.7 20 12 20C15.3 20 18 17.1 18 13.5C18 9 14.5 5.5 12 2Z" fill="#FF8C00" stroke="#E07000" stroke-width="0.5" stroke-linejoin="round"/>
+  <!-- Inner flame -->
+  <path d="M12 9C10.8 10.8 9.5 12.5 9.5 14.5C9.5 16 10.6 17 12 17C13.4 17 14.5 16 14.5 14.5C14.5 12.5 13.2 10.8 12 9Z" fill="#FFD700"/>
+  <!-- Base line -->
+  <path d="M8 21L16 21" stroke="#4A90D9" stroke-width="1.5" stroke-linecap="round"/>
+</svg>
