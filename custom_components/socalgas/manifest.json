@@ -1,13 +1,13 @@
 {
   "domain": "socalgas",
   "name": "SoCal Gas",
-  "version": "0.2.0",
-  "documentation": "https://github.com/natefox/ha-socal-gas-integration",
-  "issue_tracker": "https://github.com/natefox/ha-socal-gas-integration/issues",
   "codeowners": ["@natefox"],
-  "dependencies": ["file_upload", "recorder"],
-  "requirements": [],
   "config_flow": true,
+  "dependencies": ["file_upload", "recorder"],
+  "documentation": "https://github.com/natefox/ha-socal-gas-integration",
+  "integration_type": "service",
   "iot_class": "cloud_polling",
-  "integration_type": "service"
+  "issue_tracker": "https://github.com/natefox/ha-socal-gas-integration/issues",
+  "requirements": [],
+  "version": "0.2.0"
 }
