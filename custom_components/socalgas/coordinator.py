@@ -102,6 +102,16 @@ class SoCalGasCoordinator(DataUpdateCoordinator):
                 except SoCalGasAuthError as err:
                     _LOGGER.error("Authentication failed: %s", err)
                     err_msg = str(err).lower()
+                    if "interstitial" in err_msg or "confirm account" in err_msg:
+                        async_create(
+                            self.hass,
+                            "SoCal Gas requires you to confirm account "
+                            "information before data can be downloaded. "
+                            "Please log in to socalgas.com in a browser, "
+                            "address the popup, then restart the integration.",
+                            title="SoCal Gas: Action Required",
+                            notification_id="socalgas_interstitial",
+                        )
                     if "invalid" in err_msg and "password" in err_msg:
                         raise ConfigEntryAuthFailed(str(err)) from err
                     raise UpdateFailed(str(err)) from err

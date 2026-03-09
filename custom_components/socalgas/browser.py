@@ -166,6 +166,17 @@ export default async ({ page, context }) => {
     };
   }
 
+  // Step 3.5: Detect CCCI interstitial popup
+  if (page.url().includes('/ui/interstitials')) {
+    return {
+      data: {
+        error: 'SoCal Gas requires you to confirm account information. Please log in to socalgas.com in a browser, address the popup, then retry.',
+        error_type: 'interstitial',
+      },
+      type: 'application/json',
+    };
+  }
+
   // Step 4: Navigate to usage page to trigger SSO + AccessToken
   await page.goto('https://myaccount.socalgas.com/ui/analyze-usage', {
     waitUntil: 'networkidle2',
@@ -274,7 +285,7 @@ async def browser_authenticate(
     if "error" in data:
         error_msg = data["error"]
         error_type = data.get("error_type", "connection")
-        if error_type == "auth":
+        if error_type in ("auth", "interstitial"):
             raise SoCalGasAuthError(error_msg)
         raise SoCalGasConnectionError(error_msg)
 
