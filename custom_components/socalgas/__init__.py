@@ -36,6 +36,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         coordinator = SoCalGasCoordinator(hass, entry)
         hass.data[DOMAIN][entry.entry_id] = coordinator
 
+        # The coordinator needs at least one listener to schedule recurring
+        # updates. Since this integration has no entity platforms (data goes
+        # straight to long-term statistics), we add a no-op listener.
+        entry.async_on_unload(coordinator.async_add_listener(lambda: None))
+
         # Start the first refresh in the background so the config flow
         # finishes immediately. Progress is reported via notifications.
         await coordinator.async_request_refresh()
