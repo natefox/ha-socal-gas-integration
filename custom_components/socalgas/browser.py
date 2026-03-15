@@ -178,7 +178,7 @@ export default async ({ page, context }) => {
   }
 
   // Step 4: Navigate to usage page to trigger SSO + AccessToken
-  await page.goto('https://myaccount.socalgas.com/ui/analyze-usage', {
+  await page.goto('https://myaccount.socalgas.com/ui/ways-to-save/analyze-usage', {
     waitUntil: 'networkidle2',
     timeout: 60000,
   });
