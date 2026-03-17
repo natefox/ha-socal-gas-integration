@@ -6,9 +6,11 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from xml.etree import ElementTree as ET
+from zoneinfo import ZoneInfo
 
 ESPI_NS = "http://naesb.org/espi"
 ATOM_NS = "http://www.w3.org/2005/Atom"
+_PACIFIC = ZoneInfo("America/Los_Angeles")
 
 
 @dataclass
@@ -73,7 +75,12 @@ def _extract_readings(root: ET.Element, multiplier: int) -> list[GreenButtonRead
         duration_elem = time_period.find(f"{{{ESPI_NS}}}duration")
         if start_elem is None or start_elem.text is None:
             continue
-        start = datetime.fromtimestamp(int(start_elem.text), tz=timezone.utc)
+        # SoCal Gas encodes Pacific local time as Unix timestamps (the
+        # epoch value represents wall-clock time, not actual UTC).
+        # Reinterpret: read the wall-clock numbers, attach Pacific tz.
+        start = datetime.fromtimestamp(
+            int(start_elem.text), tz=timezone.utc
+        ).replace(tzinfo=_PACIFIC)
         duration = int(duration_elem.text) if duration_elem is not None and duration_elem.text else 3600
         raw_value = int(value_elem.text) if value_elem.text else 0
         raw_cost = int(cost_elem.text) if cost_elem is not None and cost_elem.text else 0
@@ -103,7 +110,9 @@ def _extract_summary(root: ET.Element, multiplier: int) -> GreenButtonSummary | 
         start_elem = billing_period.find(f"{{{ESPI_NS}}}start")
         dur_elem = billing_period.find(f"{{{ESPI_NS}}}duration")
         if start_elem is not None and start_elem.text:
-            period_start = datetime.fromtimestamp(int(start_elem.text), tz=timezone.utc)
+            period_start = datetime.fromtimestamp(
+                int(start_elem.text), tz=timezone.utc
+            ).replace(tzinfo=_PACIFIC)
         if dur_elem is not None and dur_elem.text:
             period_duration = int(dur_elem.text)
     return GreenButtonSummary(
