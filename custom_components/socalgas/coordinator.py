@@ -203,10 +203,30 @@ class SoCalGasCoordinator(DataUpdateCoordinator):
             return ts
         return None
 
+    async def _clear_statistics(self) -> None:
+        """Clear all existing statistics for this entry."""
+        from homeassistant.components.recorder import get_instance
+
+        name_slug = self._name_slug()
+        statistic_ids = [
+            f"{DOMAIN}:gas_consumption_{name_slug}",
+            f"{DOMAIN}:gas_cost_{name_slug}",
+        ]
+        done = asyncio.Event()
+        get_instance(self.hass).async_clear_statistics(
+            statistic_ids, on_done=done.set
+        )
+        await done.wait()
+        _LOGGER.info("Cleared existing statistics: %s", statistic_ids)
+
     async def async_redownload_range(
         self, start_date: datetime, end_date: datetime
     ) -> None:
         """Re-download a specific date range on demand."""
+        _LOGGER.info(
+            "Redownload requested: %s to %s",
+            start_date.date(), end_date.date(),
+        )
         username = self.entry.data.get(CONF_USERNAME)
         password = self.entry.data.get(CONF_PASSWORD)
         if not username or not password:
@@ -220,7 +240,8 @@ class SoCalGasCoordinator(DataUpdateCoordinator):
             try:
                 await api.authenticate()
                 await self._download_range(
-                    api, start_date, end_date, label="Re-download"
+                    api, start_date, end_date, label="Re-download",
+                    clear_first=True,
                 )
             except (SoCalGasAuthError, SoCalGasConnectionError) as err:
                 _LOGGER.error("Redownload failed: %s", err)
@@ -233,6 +254,7 @@ class SoCalGasCoordinator(DataUpdateCoordinator):
         start_date: datetime,
         end_date: datetime,
         label: str = "Import",
+        clear_first: bool = False,
     ) -> int:
         """Download and import data in chunks. Returns total readings.
 
@@ -341,6 +363,14 @@ class SoCalGasCoordinator(DataUpdateCoordinator):
             self.hass, name_slug, earliest
         )
         merged = merge_readings_with_existing(unique_readings, existing)
+
+        # Phase 3.5: Clear old statistics if requested (redownload).
+        # Done after download succeeds so we don't wipe data if download fails.
+        if clear_first:
+            await self._clear_statistics()
+            # Re-query existing (now empty) and re-merge
+            existing = {}
+            merged = merge_readings_with_existing(unique_readings, existing)
 
         # Phase 4: Compute cumulative sums and import
         running_usage_sum, running_cost_sum = await async_get_prior_sums(
