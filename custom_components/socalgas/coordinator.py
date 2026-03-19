@@ -133,10 +133,11 @@ class SoCalGasCoordinator(DataUpdateCoordinator):
                 )
             else:
                 # Dynamic refresh: fetch from the latest statistic in HA
-                # (minus 1 day overlap), capped at MAX_REFRESH_DAYS
+                # (minus 5 day overlap to cover SoCal Gas data lag),
+                # capped at MAX_REFRESH_DAYS
                 last_stat = await self._get_latest_statistic_time()
                 if last_stat:
-                    start_date = last_stat - timedelta(days=1)
+                    start_date = last_stat - timedelta(days=5)
                     earliest = end_date - timedelta(days=MAX_REFRESH_DAYS)
                     if start_date < earliest:
                         start_date = earliest
