@@ -133,11 +133,11 @@ class SoCalGasCoordinator(DataUpdateCoordinator):
                 )
             else:
                 # Dynamic refresh: fetch from the latest statistic in HA
-                # (minus 5 day overlap to cover SoCal Gas data lag),
+                # (minus 20 day overlap to cover SoCal Gas cost backfill lag),
                 # capped at MAX_REFRESH_DAYS
                 last_stat = await self._get_latest_statistic_time()
                 if last_stat:
-                    start_date = last_stat - timedelta(days=5)
+                    start_date = last_stat - timedelta(days=20)
                     earliest = end_date - timedelta(days=MAX_REFRESH_DAYS)
                     if start_date < earliest:
                         start_date = earliest
@@ -204,22 +204,6 @@ class SoCalGasCoordinator(DataUpdateCoordinator):
             return ts
         return None
 
-    async def _clear_statistics(self) -> None:
-        """Clear all existing statistics for this entry."""
-        from homeassistant.components.recorder import get_instance
-
-        name_slug = self._name_slug()
-        statistic_ids = [
-            f"{DOMAIN}:gas_consumption_{name_slug}",
-            f"{DOMAIN}:gas_cost_{name_slug}",
-        ]
-        done = asyncio.Event()
-        get_instance(self.hass).async_clear_statistics(
-            statistic_ids, on_done=done.set
-        )
-        await done.wait()
-        _LOGGER.info("Cleared existing statistics: %s", statistic_ids)
-
     async def async_redownload_range(
         self, start_date: datetime, end_date: datetime
     ) -> None:
@@ -242,7 +226,6 @@ class SoCalGasCoordinator(DataUpdateCoordinator):
                 await api.authenticate()
                 await self._download_range(
                     api, start_date, end_date, label="Re-download",
-                    clear_first=True,
                 )
             except (SoCalGasAuthError, SoCalGasConnectionError) as err:
                 _LOGGER.error("Redownload failed: %s", err)
@@ -255,7 +238,6 @@ class SoCalGasCoordinator(DataUpdateCoordinator):
         start_date: datetime,
         end_date: datetime,
         label: str = "Import",
-        clear_first: bool = False,
     ) -> int:
         """Download and import data in chunks. Returns total readings.
 
@@ -365,13 +347,6 @@ class SoCalGasCoordinator(DataUpdateCoordinator):
         )
         merged = merge_readings_with_existing(unique_readings, existing)
 
-        # Phase 3.5: Clear old statistics if requested (redownload).
-        # Done after download succeeds so we don't wipe data if download fails.
-        if clear_first:
-            await self._clear_statistics()
-            # Re-query existing (now empty) and re-merge
-            existing = {}
-            merged = merge_readings_with_existing(unique_readings, existing)
 
         # Phase 4: Compute cumulative sums and import
         running_usage_sum, running_cost_sum = await async_get_prior_sums(
