@@ -9,10 +9,13 @@ Once the AccessToken is obtained, all subsequent SmartCMobile API calls
 """
 from __future__ import annotations
 
+import json
 import logging
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
 import aiohttp
+
+from .totp import upcoming_codes
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -21,7 +24,7 @@ _LOGGER = logging.getLogger(__name__)
 # Returns JSON with access_token + account_number, or error + error_type.
 _LOGIN_JS = r"""
 export default async ({ page, context }) => {
-  const { username, password } = context;
+  const { username, password, totpCodes } = context;
 
   let accessToken = null;
   let accountNumber = null;
@@ -136,20 +139,167 @@ export default async ({ page, context }) => {
     };
   }
 
-  // Step 3: Wait for redirect away from login
-  try {
-    await page.waitForFunction(
-      () => !window.location.href.includes('/ui/login'),
-      { timeout: 60000 }
-    );
-  } catch (e) {
-    return {
-      data: {
-        error: 'Login failed — page did not redirect. Check your username and password.',
-        error_type: 'auth',
-      },
-      type: 'application/json',
+  // Step 3: Wait for redirect away from login, answering a 2-step
+  // verification prompt on the way. The code
+  // prompt stays under /ui/login, so "left /ui/login" alone isn't enough.
+  // Everything below runs in one page.evaluate per tick because the form
+  // lives in nested shadow roots.
+  const scan = () => page.evaluate(() => {
+    const all = [];
+    const walk = (root) => {
+      for (const el of root.querySelectorAll('*')) {
+        all.push(el);
+        if (el.shadowRoot) walk(el.shadowRoot);
+      }
     };
+    walk(document);
+    const visible = (el) => {
+      const r = el.getBoundingClientRect();
+      const st = getComputedStyle(el);
+      return r.width > 0 && r.height > 0 && st.visibility !== 'hidden' && st.display !== 'none';
+    };
+    const describe = (el) => {
+      const host = el.getRootNode() && el.getRootNode().host;
+      return [el.id, el.name, el.placeholder, el.getAttribute('aria-label'),
+              el.getAttribute('autocomplete'), host && host.getAttribute('label'),
+              host && host.textContent].filter(Boolean).join(' ');
+    };
+    const inputs = all.filter((el) => el.tagName === 'INPUT' && visible(el));
+    const password = inputs.find((el) => el.type === 'password');
+    const otpRe = /one-time-code|\botp\b|code|passcode|verif|token|authenticat|2fa|mfa/i;
+    const skip = ['email', 'password', 'hidden', 'checkbox', 'radio', 'submit', 'button'];
+    const candidates = inputs.filter((el) => !skip.includes(el.type));
+    // One box per digit (six maxlength=1 inputs) or a single code field.
+    const boxes = password ? [] : candidates.filter((el) => el.maxLength === 1);
+    let otp = boxes.length >= 6 ? boxes[0] : undefined;
+    if (!otp) otp = candidates.find((el) => el.autocomplete === 'one-time-code' || otpRe.test(describe(el)));
+    if (!otp && !password) {
+      otp = candidates.find((el) => el.maxLength === 6 || el.inputMode === 'numeric');
+    }
+    const clickable = all.filter((el) => (el.tagName === 'BUTTON' || el.getAttribute('role') === 'button'
+      || el.getAttribute('role') === 'radio' || el.tagName === 'LABEL') && visible(el));
+    const text = (el) => (el.textContent || '').replace(/\s+/g, ' ').trim();
+    // Tag what the next step may click, so the Node side can act on it.
+    all.forEach((el) => el.removeAttribute && el.removeAttribute('data-scg-patch'));
+    if (boxes.length >= 6) boxes.slice(0, 6).forEach((el, i) => el.setAttribute('data-scg-patch', 'otp-' + i));
+    else if (otp) otp.setAttribute('data-scg-patch', 'otp');
+    const submit = [/^(verify|submit|confirm)\b/i, /^(continue|next|send)\b/i, /^(log ?in|sign ?in)\b/i]
+      .map((re) => clickable.find((el) => re.test(text(el)))).find(Boolean);
+    if (submit) submit.setAttribute('data-scg-patch', 'submit');
+    const method = clickable.find((el) => /authenticator/i.test(text(el)));
+    if (method && !otp && !password) method.setAttribute('data-scg-patch', 'method');
+    const bodyText = (document.body ? document.body.innerText : '').replace(/\s+/g, ' ').trim();
+    return {
+      url: window.location.href,
+      onLogin: window.location.href.includes('/ui/login'),
+      password: !!password,
+      otp: !!otp,
+      otpBoxes: boxes.length >= 6,
+      submit: !!submit,
+      method: !!(method && !otp && !password),
+      text: bodyText.slice(0, 1500),
+      inputs: inputs.map((el) => ({ type: el.type, desc: describe(el).slice(0, 80),
+                                    maxlength: el.maxLength, inputmode: el.inputMode })),
+      buttons: clickable.map(text).filter(Boolean).slice(0, 25),
+    };
+  });
+  // Elements tagged by scan(), found again through the shadow roots.
+  const tagged = (tag) => page.evaluateHandle((t) => {
+    const find = (root) => {
+      for (const el of root.querySelectorAll('*')) {
+        if (el.getAttribute('data-scg-patch') === t) return el;
+        if (el.shadowRoot) { const f = find(el.shadowRoot); if (f) return f; }
+      }
+      return null;
+    };
+    return find(document);
+  }, tag);
+  const debugOf = (st) => ({ url: st.url, text: st.text, inputs: st.inputs, buttons: st.buttons });
+
+  const deadline = Date.now() + 90000;
+  let attempts = 0;
+  let methodClicked = false;
+  let methodContinued = false;
+  let lastSubmit = 0;
+  let st = null;
+  for (;;) {
+    await new Promise(r => setTimeout(r, 1000));
+    try { st = await scan(); } catch (e) { continue; }  // navigating
+    // Done once off the login page, unless the code prompt has its own URL.
+    // (Not "any code field": the account pages have ZIP code inputs.)
+    if (!st.onLogin && !/mfa|verif|otp|factor|2fa|challenge/i.test(st.url)) break;
+    if (Date.now() > deadline) {
+      return {
+        data: {
+          error: st.password
+            ? 'Login failed — still on the login form. Check your username and password.'
+            : 'Login failed — stuck after the password step (2-step verification?).',
+          error_type: 'auth',
+          debug: debugOf(st),
+        },
+        type: 'application/json',
+      };
+    }
+    if (st.password) continue;
+    if (st.method && !methodClicked) {
+      methodClicked = true;
+      const m = await tagged('method');
+      if (m) { await m.click(); }
+      continue;
+    }
+    // A method picker usually needs a Continue/Send after the choice.
+    if (methodClicked && !methodContinued && !st.otp && st.submit) {
+      methodContinued = true;
+      const b = await tagged('submit');
+      if (b) { await b.click(); }
+      continue;
+    }
+    if (st.otp && Date.now() - lastSubmit > 12000) {
+      if (!totpCodes) {
+        return {
+          data: {
+            error: 'SoCal Gas asked for a 2-step verification code. Add your authenticator setup key (TOTP secret) to the integration.',
+            error_type: 'auth',
+            debug: debugOf(st),
+          },
+          type: 'application/json',
+        };
+      }
+      if (attempts >= 2) {
+        return {
+          data: { error: 'SoCal Gas rejected the verification code twice. Check the TOTP setup key.', error_type: 'auth', debug: debugOf(st) },
+          type: 'application/json',
+        };
+      }
+      // Don't start typing a code that expires mid-entry.
+      if ((Date.now() / 1000) % 30 > 26) continue;
+      const code = totpCodes[String(Math.floor(Date.now() / 1000 / 30))];
+      if (!code) {
+        return {
+          data: { error: 'No verification code for the current time (clock skew?).', error_type: 'connection', debug: debugOf(st) },
+          type: 'application/json',
+        };
+      }
+      attempts += 1;
+      if (st.otpBoxes) {
+        for (let i = 0; i < 6; i++) {
+          const b = await tagged('otp-' + i);
+          if (!b) break;
+          await b.click({ clickCount: 3 });
+          await page.keyboard.type(code[i], { delay: 60 });
+        }
+      } else {
+        const box = await tagged('otp');
+        if (!box) continue;
+        await box.click({ clickCount: 3 });
+        await page.keyboard.type(code, { delay: 60 });
+      }
+      await new Promise(r => setTimeout(r, 500));
+      const fresh = await scan();
+      const btn = fresh.submit ? await tagged('submit') : null;
+      if (btn) { await btn.click(); } else { await page.keyboard.press('Enter'); }
+      lastSubmit = Date.now();
+    }
   }
 
   // Let the page settle
@@ -225,7 +375,8 @@ def _build_function_url(base_url: str, timeout_ms: int = 120000) -> str:
 
 
 async def browser_authenticate(
-    browserless_url: str, username: str, password: str
+    browserless_url: str, username: str, password: str,
+    totp_secret: str | None = None,
 ) -> tuple[str, str]:
     """Authenticate via Browserless Chrome /function API.
 
@@ -233,6 +384,8 @@ async def browser_authenticate(
         browserless_url: Base URL of Browserless (e.g. http://browserless:3000).
         username: SoCal Gas username/email.
         password: SoCal Gas password.
+        totp_secret: Authenticator setup key, for accounts with 2-step
+            verification.
 
     Returns:
         Tuple of (access_token, account_number).
@@ -243,7 +396,10 @@ async def browser_authenticate(
     """
     from .api import SoCalGasAuthError, SoCalGasConnectionError
 
-    function_url = _build_function_url(browserless_url)
+    function_url = _build_function_url(browserless_url, timeout_ms=180000)
+    context = {"username": username, "password": password}
+    if totp_secret:
+        context["totpCodes"] = upcoming_codes(totp_secret)
 
     try:
         async with aiohttp.ClientSession() as session:
@@ -251,9 +407,9 @@ async def browser_authenticate(
                 function_url,
                 json={
                     "code": _LOGIN_JS,
-                    "context": {"username": username, "password": password},
+                    "context": context,
                 },
-                timeout=aiohttp.ClientTimeout(total=120),
+                timeout=aiohttp.ClientTimeout(total=190),
             ) as resp:
                 if resp.status == 401:
                     raise SoCalGasConnectionError(
@@ -283,6 +439,13 @@ async def browser_authenticate(
 
     # Check for error responses from our JS code
     if "error" in data:
+        if data.get("debug"):
+            # What the page showed, so the login steps can be fixed from the
+            # log. The password is never on the page; mask the email.
+            _LOGGER.warning(
+                "SoCal Gas login page at failure: %s",
+                json.dumps(data["debug"]).replace(username, "<username>"),
+            )
         error_msg = data["error"]
         error_type = data.get("error_type", "connection")
         if error_type in ("auth", "interstitial"):

@@ -24,6 +24,7 @@ from .const import (
     CONF_BROWSERLESS_URL,
     CONF_LOOKBACK_DAYS,
     CONF_PASSWORD,
+    CONF_TOTP_SECRET,
     CONF_REFRESH_INTERVAL_HOURS,
     CONF_USERNAME,
     DEFAULT_REFRESH_INTERVAL_HOURS,
@@ -92,7 +93,10 @@ class SoCalGasCoordinator(DataUpdateCoordinator):
             api = pending_api
         else:
             _LOGGER.info("Creating new API session, will authenticate")
-            api = SoCalGasAPI(username, password, browserless_url=browserless_url)
+            api = SoCalGasAPI(
+                username, password, browserless_url=browserless_url,
+                totp_secret=self.entry.data.get(CONF_TOTP_SECRET),
+            )
         try:
             if not pending_api:
                 _LOGGER.info("Authenticating with SoCal Gas...")
@@ -221,7 +225,10 @@ class SoCalGasCoordinator(DataUpdateCoordinator):
         browserless_url = self.entry.data.get(CONF_BROWSERLESS_URL)
 
         async with self._download_lock:
-            api = SoCalGasAPI(username, password, browserless_url=browserless_url)
+            api = SoCalGasAPI(
+                username, password, browserless_url=browserless_url,
+                totp_secret=self.entry.data.get(CONF_TOTP_SECRET),
+            )
             try:
                 await api.authenticate()
                 await self._download_range(

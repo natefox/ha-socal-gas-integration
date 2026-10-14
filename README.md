@@ -68,6 +68,15 @@ When adding the integration, you'll see two setup methods:
 4. Choose how many days of historical data to import (default: 365)
 5. The integration will automatically fetch data daily
 
+> **2-step verification:** if your SoCal Gas account asks for a code from an
+> authenticator app at login, also fill in **Authenticator setup key**: the key
+> (or the whole `otpauth://` link) shown when you added SoCal Gas to your
+> authenticator app. Home Assistant then generates the 6-digit codes itself and
+> enters them during login. Leave it empty if your account has no 2-step
+> verification. Text-message codes can't be automated; switch the account to an
+> authenticator app (My Account → Log In and Security) or use the file upload.
+> The key is stored in the config entry next to the password.
+
 **Upload Green Button Data (Manual, works everywhere)**
 
 This works on all HA installations without any additional setup.

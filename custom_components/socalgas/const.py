@@ -4,6 +4,7 @@ CONF_UPLOADED_FILE = "uploaded_file"
 CONF_ACCOUNT_NAME = "account_name"
 CONF_USERNAME = "username"
 CONF_PASSWORD = "password"
+CONF_TOTP_SECRET = "totp_secret"  # authenticator setup key (2-step verification)
 CONF_ACCOUNT_NUMBER = "account_number"
 CONF_METER_NUMBER = "meter_number"
 CONF_LOOKBACK_DAYS = "lookback_days"

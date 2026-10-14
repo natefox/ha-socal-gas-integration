@@ -56,10 +56,12 @@ class SoCalGasAPI:
         password: str,
         session: aiohttp.ClientSession | None = None,
         browserless_url: str | None = None,
+        totp_secret: str | None = None,
     ) -> None:
         """Initialize the API client."""
         self._username = username
         self._password = password
+        self._totp_secret = totp_secret
         self._external_session = session is not None
         self._session = session
         self._browserless_url = browserless_url
@@ -101,7 +103,8 @@ class SoCalGasAPI:
             )
 
         access_token, account_number = await browser_authenticate(
-            self._browserless_url, self._username, self._password
+            self._browserless_url, self._username, self._password,
+            totp_secret=self._totp_secret,
         )
         self._access_token = access_token
 

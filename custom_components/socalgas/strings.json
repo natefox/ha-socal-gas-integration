@@ -15,10 +15,12 @@
         "data": {
           "username": "Email / Username",
           "password": "Password",
-          "browserless_url": "Browserless URL"
+          "browserless_url": "Browserless URL",
+          "totp_secret": "Authenticator setup key (optional)"
         },
         "data_description": {
-          "browserless_url": "URL of your Browserless Chrome instance. For Docker, use http://browserless:3000. For the HA add-on, use http://addon-browserless-chrome:3000. Append ?token=YOUR_TOKEN if authentication is enabled."
+          "browserless_url": "URL of your Browserless Chrome instance. For Docker, use http://browserless:3000. For the HA add-on, use http://addon-browserless-chrome:3000. Append ?token=YOUR_TOKEN if authentication is enabled.",
+          "totp_secret": "Only if your SoCal Gas account uses 2-step verification with an authenticator app: the setup key (or otpauth:// link) the app was given. Home Assistant generates the 6-digit codes from it."
         }
       },
       "account_name": {
@@ -41,7 +43,7 @@
       },
       "upload": {
         "title": "Upload Usage Data",
-        "description": "Upload a Green Button ZIP file downloaded from socalgas.com.\n\nTo get this file: log in at socalgas.com \u2192 My Account \u2192 Analyze Usage \u2192 Download My Data (Green Button).",
+        "description": "Upload a Green Button ZIP file downloaded from socalgas.com.\n\nTo get this file: log in at socalgas.com → My Account → Analyze Usage → Download My Data (Green Button).",
         "data": {
           "uploaded_file": "Green Button ZIP File"
         }
@@ -59,7 +61,11 @@
         "data": {
           "username": "Email / Username",
           "password": "Password",
-          "browserless_url": "Browserless URL"
+          "browserless_url": "Browserless URL",
+          "totp_secret": "Authenticator setup key (optional)"
+        },
+        "data_description": {
+          "totp_secret": "Only if your SoCal Gas account uses 2-step verification with an authenticator app: the setup key (or otpauth:// link) the app was given. Home Assistant generates the 6-digit codes from it."
         }
       }
     },
@@ -67,7 +73,8 @@
       "invalid_file": "Could not parse the uploaded file. Please upload a valid Green Button ZIP from socalgas.com.",
       "no_data": "The uploaded file contained no usage data.",
       "invalid_auth": "Invalid username or password.",
-      "cannot_connect": "Could not connect. Check that Browserless Chrome is running and reachable at the configured URL, or the site may be rate-limiting requests \u2014 wait a few minutes and try again."
+      "cannot_connect": "Could not connect. Check that Browserless Chrome is running and reachable at the configured URL, or the site may be rate-limiting requests — wait a few minutes and try again.",
+      "invalid_totp": "The authenticator setup key is not valid (it should be base32 letters A-Z and digits 2-7)."
     },
     "abort": {
       "already_configured": "This account is already configured.",

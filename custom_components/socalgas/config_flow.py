@@ -31,6 +31,7 @@ from .const import (
     CONF_METER_NUMBER,
     CONF_PASSWORD,
     CONF_REFRESH_INTERVAL_HOURS,
+    CONF_TOTP_SECRET,
     CONF_UPLOADED_FILE,
     CONF_USERNAME,
     DEFAULT_BROWSERLESS_URL,
@@ -38,6 +39,7 @@ from .const import (
     DOMAIN,
 )
 from .green_button_parser import parse_green_button_zip
+from .totp import InvalidTotpSecret, normalize_secret
 from .statistics import (
     async_get_existing_states,
     async_get_prior_sums,
@@ -55,6 +57,9 @@ STEP_CREDENTIALS_SCHEMA = vol.Schema(
         vol.Optional(
             CONF_BROWSERLESS_URL, default=DEFAULT_BROWSERLESS_URL
         ): str,
+        # For accounts with 2-step verification by
+        # authenticator app. Leave empty if the account has no 2FA.
+        vol.Optional(CONF_TOTP_SECRET): str,
     }
 )
 
@@ -83,6 +88,7 @@ class SoCalGasConfigFlow(ConfigFlow, domain=DOMAIN):
         self._account_name: str = ""
         self._username: str = ""
         self._password: str = ""
+        self._totp_secret: str | None = None
         self._browserless_url: str = DEFAULT_BROWSERLESS_URL
         self._account_number: str = ""
         self._meter_number: str = ""
@@ -111,11 +117,24 @@ class SoCalGasConfigFlow(ConfigFlow, domain=DOMAIN):
             self._browserless_url = user_input.get(
                 CONF_BROWSERLESS_URL, DEFAULT_BROWSERLESS_URL
             )
+            try:
+                self._totp_secret = (
+                    normalize_secret(user_input[CONF_TOTP_SECRET])
+                    if user_input.get(CONF_TOTP_SECRET) else None
+                )
+            except InvalidTotpSecret:
+                errors[CONF_TOTP_SECRET] = "invalid_totp"
+                return self.async_show_form(
+                    step_id="credentials",
+                    data_schema=STEP_CREDENTIALS_SCHEMA,
+                    errors=errors,
+                )
 
             api = SoCalGasAPI(
                 self._username,
                 self._password,
                 browserless_url=self._browserless_url,
+                totp_secret=self._totp_secret,
             )
             try:
                 account_info = await api.authenticate()
@@ -206,6 +225,7 @@ class SoCalGasConfigFlow(ConfigFlow, domain=DOMAIN):
                     CONF_ACCOUNT_NAME: self._account_name,
                     CONF_USERNAME: self._username,
                     CONF_PASSWORD: self._password,
+                    CONF_TOTP_SECRET: self._totp_secret,
                     CONF_BROWSERLESS_URL: self._browserless_url,
                     CONF_ACCOUNT_NUMBER: self._account_number,
                     CONF_METER_NUMBER: self._meter_number,
@@ -303,10 +323,25 @@ class SoCalGasConfigFlow(ConfigFlow, domain=DOMAIN):
                 CONF_BROWSERLESS_URL,
                 reauth_entry.data.get(CONF_BROWSERLESS_URL, DEFAULT_BROWSERLESS_URL),
             )
+            try:
+                # Blank keeps the stored key: the form can't show it.
+                totp_secret = (
+                    normalize_secret(user_input[CONF_TOTP_SECRET])
+                    if user_input.get(CONF_TOTP_SECRET)
+                    else reauth_entry.data.get(CONF_TOTP_SECRET)
+                )
+            except InvalidTotpSecret:
+                errors[CONF_TOTP_SECRET] = "invalid_totp"
+                return self.async_show_form(
+                    step_id="reauth_confirm",
+                    data_schema=STEP_CREDENTIALS_SCHEMA,
+                    errors=errors,
+                )
             api = SoCalGasAPI(
                 user_input[CONF_USERNAME],
                 user_input[CONF_PASSWORD],
                 browserless_url=browserless_url,
+                totp_secret=totp_secret,
             )
             try:
                 account_info = await api.authenticate()
@@ -318,6 +353,7 @@ class SoCalGasConfigFlow(ConfigFlow, domain=DOMAIN):
                         **reauth_entry.data,
                         CONF_USERNAME: user_input[CONF_USERNAME],
                         CONF_PASSWORD: user_input[CONF_PASSWORD],
+                        CONF_TOTP_SECRET: totp_secret,
                         CONF_BROWSERLESS_URL: browserless_url,
                         CONF_ACCOUNT_NUMBER: account_info.account_number,
                         CONF_METER_NUMBER: account_info.meter_number,

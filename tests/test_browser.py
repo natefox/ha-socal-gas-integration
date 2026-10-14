@@ -192,7 +192,46 @@ class TestBrowserAuthenticate:
 
         # Verify the post was called with correct URL and payload
         call_args = mock_session.post.call_args
-        assert call_args[0][0] == "http://browserless:3000/function?timeout=120000"
+        assert call_args[0][0] == "http://browserless:3000/function?timeout=180000"
         payload = call_args[1]["json"]
         assert "code" in payload
         assert payload["context"] == {"username": "user@test.com", "password": "mypass"}
+
+    def test_sends_totp_codes_when_secret_given(self):
+        """With a TOTP secret, the context carries upcoming codes keyed by time step."""
+        mock_resp = _make_mock_response(200, {"access_token": "t", "account_number": "1234567890"})
+        mock_session = _make_mock_session(mock_resp)
+
+        with patch("custom_components.socalgas.browser.aiohttp.ClientSession",
+                   return_value=mock_session):
+            asyncio.get_event_loop().run_until_complete(
+                browser_authenticate("http://browserless:3000", "user@test.com", "mypass",
+                                     totp_secret="JBSWY3DPEHPK3PXP")
+            )
+
+        context = mock_session.post.call_args[1]["json"]["context"]
+        assert context["username"] == "user@test.com"
+        codes = context["totpCodes"]
+        assert len(codes) >= 10
+        assert all(len(c) == 6 and c.isdigit() for c in codes.values())
+
+    def test_failure_debug_is_logged_without_username(self, caplog):
+        """A failed login logs the page structure with the username masked."""
+        mock_resp = _make_mock_response(200, {
+            "error": "Login failed",
+            "error_type": "auth",
+            "debug": {"url": "https://myaccount.socalgas.com/ui/login",
+                      "text": "Signed in as user@test.com. Enter the code", "inputs": [], "buttons": []},
+        })
+        mock_session = _make_mock_session(mock_resp)
+
+        with patch("custom_components.socalgas.browser.aiohttp.ClientSession",
+                   return_value=mock_session):
+            with pytest.raises(SoCalGasAuthError):
+                asyncio.get_event_loop().run_until_complete(
+                    browser_authenticate("http://browserless:3000", "user@test.com", "pass")
+                )
+
+        assert "login page at failure" in caplog.text
+        assert "user@test.com" not in caplog.text
+        assert "<username>" in caplog.text
