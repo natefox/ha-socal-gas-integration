@@ -3,14 +3,17 @@ from __future__ import annotations
 
 import zipfile
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from xml.etree import ElementTree as ET
-from zoneinfo import ZoneInfo
 
 ESPI_NS = "http://naesb.org/espi"
 ATOM_NS = "http://www.w3.org/2005/Atom"
-_PACIFIC = ZoneInfo("America/Los_Angeles")
+# SoCal Gas timestamps are Pacific *Standard* Time wall-clock values all
+# year; they do not shift for daylight saving time. Use a fixed UTC-8
+# offset rather than America/Los_Angeles, which would read summer
+# timestamps as PDT and file every reading one hour early.
+_PACIFIC_STANDARD = timezone(timedelta(hours=-8))
 
 
 @dataclass
@@ -75,12 +78,12 @@ def _extract_readings(root: ET.Element, multiplier: int) -> list[GreenButtonRead
         duration_elem = time_period.find(f"{{{ESPI_NS}}}duration")
         if start_elem is None or start_elem.text is None:
             continue
-        # SoCal Gas encodes Pacific local time as Unix timestamps (the
-        # epoch value represents wall-clock time, not actual UTC).
-        # Reinterpret: read the wall-clock numbers, attach Pacific tz.
+        # SoCal Gas encodes Pacific Standard Time wall-clock values as Unix
+        # timestamps (the epoch value is not actual UTC). Reinterpret: read
+        # the wall-clock numbers, attach the fixed PST offset.
         start = datetime.fromtimestamp(
             int(start_elem.text), tz=timezone.utc
-        ).replace(tzinfo=_PACIFIC)
+        ).replace(tzinfo=_PACIFIC_STANDARD)
         duration = int(duration_elem.text) if duration_elem is not None and duration_elem.text else 3600
         raw_value = int(value_elem.text) if value_elem.text else 0
         raw_cost = int(cost_elem.text) if cost_elem is not None and cost_elem.text else 0
@@ -112,7 +115,7 @@ def _extract_summary(root: ET.Element, multiplier: int) -> GreenButtonSummary | 
         if start_elem is not None and start_elem.text:
             period_start = datetime.fromtimestamp(
                 int(start_elem.text), tz=timezone.utc
-            ).replace(tzinfo=_PACIFIC)
+            ).replace(tzinfo=_PACIFIC_STANDARD)
         if dur_elem is not None and dur_elem.text:
             period_duration = int(dur_elem.text)
     return GreenButtonSummary(
